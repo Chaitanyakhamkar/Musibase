@@ -257,4 +257,35 @@
   .song-title {
     font-size: 36px;
   }
+  
+  .details-header {
+    gap: 32px;
+  }
+
+  .lyrics-container {
+    flex-direction: column !important;
+  }
+
+  .lyrics-col {
+    padding-left: 0 !important;
+    border-left: none !important;
+  }
+
+  .external-links {
+    flex-direction: column;
+  }
+
+  .panel-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 16px;
+  }
+
+  .translate-controls {
+    width: 100%;
+  }
+
+  .lang-select, .translate-controls button {
+    flex: 1;
+  }
 }

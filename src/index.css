@@ -261,3 +261,34 @@ footer {
   color: var(--text-muted);
   font-size: 14px;
 }
+
+/* Global Mobile Responsiveness */
+@media (max-width: 768px) {
+  .container {
+    padding: 0 20px;
+  }
+
+  .navbar .container {
+    flex-direction: column;
+    height: auto;
+    padding: 16px 20px;
+    gap: 16px;
+  }
+
+  .nav-links {
+    width: 100%;
+    justify-content: center;
+    gap: 16px;
+  }
+
+  .footer-content {
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+  }
+
+  .bg-glow {
+    width: 100vw;
+    height: 40vh;
+  }
+}

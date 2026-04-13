@@ -256,3 +256,38 @@
   0% { transform: translate3d(0, 0, 0); }
   100% { transform: translate3d(-33.33%, 0, 0); }
 }
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .hero {
+    padding: 60px 0 40px;
+  }
+  .hero-title {
+    font-size: 38px;
+  }
+  .hero-subtitle {
+    font-size: 15px;
+    margin-bottom: 32px;
+  }
+  .search-form {
+    flex-direction: column;
+    border-radius: 16px;
+    padding: 16px;
+    gap: 16px;
+  }
+  .search-input {
+    width: 100%;
+    text-align: center;
+  }
+  .search-form .btn {
+    width: 100%;
+    border-radius: 12px;
+  }
+  .marquee-wrapper {
+    width: 400vw;
+  }
+  .results-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}

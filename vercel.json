@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/translate-api/:path*",
+      "destination": "https://translate.googleapis.com/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
