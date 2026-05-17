@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabase';
+import { auth } from '../firebase';
+import { confirmPasswordReset } from 'firebase/auth';
 import { KeyRound, AlertCircle } from 'lucide-react';
 
 const ResetPassword = () => {
@@ -8,23 +9,22 @@ const ResetPassword = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+  const [oobCode, setOobCode] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Supabase automatically parses the #access_token from the URL when redirecting from email.
-    // If the user lands here directly without a session, they will be prompted to login.
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        // Handle no active recovery session - usually because fragment was dropped or already used
-        // But let's allow them to stay, maybe the session is setting up in the background.
-      }
-    };
-    checkSession();
+    const queryParams = new URLSearchParams(window.location.search);
+    const code = queryParams.get('oobCode');
+    if (code) {
+      setOobCode(code);
+    } else {
+      setError("Invalid or missing password reset link.");
+    }
   }, []);
 
   const handleUpdatePassword = async (e) => {
     e.preventDefault();
+    if (!oobCode) return setError('Missing recovery code from URL.');
     if (password.length < 6) {
       setError('Password should be at least 6 characters long.');
       return;
@@ -33,10 +33,7 @@ const ResetPassword = () => {
     setLoading(true);
     setError(null);
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: password
-      });
-      if (error) throw error;
+      await confirmPasswordReset(auth, oobCode, password);
       setSuccess(true);
       setTimeout(() => navigate('/login'), 3000);
     } catch (err) {

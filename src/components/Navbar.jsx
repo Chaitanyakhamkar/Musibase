@@ -1,27 +1,21 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Music, LogIn, LogOut } from 'lucide-react';
-import { supabase } from '../supabase';
+import { auth } from '../firebase';
+import { signOut } from 'firebase/auth';
+import { useAuth } from '../AuthContext';
 
 const Navbar = () => {
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate('/');
+    try {
+      await signOut(auth);
+      navigate('/');
+    } catch (error) {
+      console.error("Error signing out: ", error);
+    }
   };
 
   return (

@@ -1,9 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Music, Disc, Loader } from 'lucide-react';
+import { Search, Music, Disc, Loader, Sparkles } from 'lucide-react';
+import { useAuth } from '../AuthContext';
+import { db } from '../firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import './Home.css';
 
 const Home = () => {
+  const { user } = useAuth();
+  const [recommendations, setRecommendations] = useState([]);
+  const [loadingRecs, setLoadingRecs] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -54,15 +60,61 @@ const Home = () => {
     fetchPosters();
   }, []);
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    if (!query.trim()) return;
+  useEffect(() => {
+    if (!user) {
+      setRecommendations([]);
+      return;
+    }
+    
+    const fetchRecommendations = async () => {
+      setLoadingRecs(true);
+      try {
+        const likedRef = collection(db, 'liked_songs');
+        const qLiked = query(likedRef, where('user_id', '==', user.uid));
+        const likedSnap = await getDocs(qLiked);
+        
+        const likedSongs = likedSnap.docs.map(d => d.data());
+          
+        if (likedSongs.length > 0) {
+          // Analyze user's tastes by finding their most liked artist or genre
+          const keywords = likedSongs.map(s => s.artist_name || s.genre).filter(Boolean);
+          if (keywords.length === 0) return;
+          
+          const frequencies = {};
+          let maxFreq = 0;
+          let bestKeyword = keywords[0];
+          
+          for (const k of keywords) {
+            frequencies[k] = (frequencies[k] || 0) + 1;
+            if (frequencies[k] > maxFreq) {
+              maxFreq = frequencies[k];
+              bestKeyword = k;
+            }
+          }
+          
+          // Implicit automated search based on top taste!
+          const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(bestKeyword)}&entity=song&limit=8`);
+          const data = await res.json();
+          // Filter out exact songs they already liked? Let's just shuffle and show
+          setRecommendations(data.results || []);
+        }
+      } catch (err) {
+        console.error('Error fetching recs', err);
+      } finally {
+        setLoadingRecs(false);
+      }
+    };
+    
+    fetchRecommendations();
+  }, [user]);
 
+  const performSearch = async (searchTerm) => {
+    if (!searchTerm.trim()) return;
     setLoading(true);
     setHasSearched(true);
     try {
       // Using iTunes Search API for general music data
-      const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=song&limit=12`);
+      const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=song&limit=12`);
       const data = await res.json();
       setResults(data.results || []);
     } catch (err) {
@@ -70,6 +122,16 @@ const Home = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    performSearch(query);
+  };
+
+  const handleGenreClick = (genre) => {
+    setQuery(genre);
+    performSearch(genre);
   };
 
   const msToMinutes = (ms) => {
@@ -119,6 +181,26 @@ const Home = () => {
               {loading ? <div className="loader"></div> : 'Search'}
             </button>
           </form>
+
+          <div className="genre-chips" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '24px', maxWidth: '600px' }}>
+            {['Bollywood', 'Punjabi Hit', 'Pop', 'Hip-Hop', 'Classical', 'Lofi Chill', 'Workout'].map((genre) => (
+              <button
+                key={genre}
+                onClick={() => handleGenreClick(genre)}
+                className="btn btn-ghost"
+                style={{ 
+                  padding: '6px 12px', 
+                  fontSize: '13px', 
+                  borderRadius: '99px', 
+                  border: '1px solid var(--border-color)',
+                  background: query === genre ? 'var(--primary-color)' : 'var(--bg-color-light)',
+                  color: query === genre ? '#000' : 'var(--text-muted)'
+                }}
+              >
+                {genre}
+              </button>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -168,6 +250,47 @@ const Home = () => {
                   <p>Try searching with different keywords.</p>
                 </div>
               )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Recommended For You Section */}
+      {recommendations.length > 0 && !hasSearched && (
+        <section className="results-section" style={{ paddingTop: 0 }}>
+          <div className="container">
+            <h2 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Sparkles size={24} color="var(--primary-color)" /> Recommended For You
+            </h2>
+            <div className="results-grid">
+              {recommendations.map((track) => (
+                <div 
+                  key={`rec-${track.trackId}`} 
+                  className="track-card glass-panel"
+                  onClick={() => navigate(`/song/${track.trackId}`, { state: { track } })}
+                >
+                  <div className="track-art">
+                    <img src={track.artworkUrl100?.replace('100x100', '300x300')} alt={track.trackName} />
+                    <div className="track-play-overlay">
+                      <Music className="overlay-icon" />
+                    </div>
+                  </div>
+                  <div className="track-info">
+                    <h3 className="track-title">{track.trackName}</h3>
+                    <p className="track-artist">{track.artistName}</p>
+                    
+                    <div className="track-meta">
+                      <span className="meta-item">
+                        <Disc size={14} />
+                        {track.collectionName || 'Unknown Album'}
+                      </span>
+                      <span className="meta-duration">
+                        {msToMinutes(track.trackTimeMillis)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </section>

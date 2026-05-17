@@ -1,16 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Clock, Disc, User, Calendar, Tag, PlayCircle, Globe, Languages, Loader, Edit2, Save, X } from 'lucide-react';
+import { ArrowLeft, Clock, Disc, User, Calendar, Tag, PlayCircle, Globe, Languages, Loader, Edit2, Save, X, Heart, ListMusic } from 'lucide-react';
+import { useAuth } from '../AuthContext';
+import { db } from '../firebase';
+import { doc, setDoc, deleteDoc, getDoc, collection, query, where, getDocs, updateDoc, arrayUnion } from 'firebase/firestore';
 import './SongDetails.css';
 
 const SongDetails = () => {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  
   const [track, setTrack] = useState(location.state?.track || null);
   const [lyrics, setLyrics] = useState(null);
   const [loadingLyrics, setLoadingLyrics] = useState(true);
   const [loadingTrack, setLoadingTrack] = useState(!track);
+  
+  const [isLiked, setIsLiked] = useState(false);
+  const [liking, setLiking] = useState(false);
+  
+  const [userPlaylists, setUserPlaylists] = useState([]);
+  const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
 
   // Translation states
   const [translatedLyrics, setTranslatedLyrics] = useState(null);
@@ -148,6 +159,76 @@ const SongDetails = () => {
     fetchLyrics();
   }, [track]);
 
+  useEffect(() => {
+    const checkLikedStatus = async () => {
+      if (!user || !track) return;
+      const likeRef = doc(db, 'liked_songs', `${user.uid}_${track.trackId}`);
+      const snap = await getDoc(likeRef);
+      setIsLiked(snap.exists());
+    };
+    checkLikedStatus();
+    
+    const fetchPlaylists = async () => {
+      if (!user) return;
+      const playlistsRef = collection(db, 'playlists');
+      const qPlaylists = query(playlistsRef, where('user_id', '==', user.uid));
+      const snap = await getDocs(qPlaylists);
+      setUserPlaylists(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    };
+    fetchPlaylists();
+  }, [user, track]);
+
+  const handleLikeToggle = async () => {
+    if (!user) {
+      alert("Please sign in to save songs to your library!");
+      navigate('/login');
+      return;
+    }
+    setLiking(true);
+    const likeRef = doc(db, 'liked_songs', `${user.uid}_${track.trackId}`);
+    try {
+      if (isLiked) {
+        await deleteDoc(likeRef);
+        setIsLiked(false);
+      } else {
+        await setDoc(likeRef, {
+          user_id: user.uid,
+          track_id: String(track.trackId),
+          track_name: track.trackName,
+          artist_name: track.artistName,
+          genre: track.primaryGenreName,
+          artwork_url: track.artworkUrl100?.replace('100x100', '300x300'),
+          liked_at: new Date().toISOString()
+        });
+        setIsLiked(true);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error updating liked songs.");
+    } finally {
+      setLiking(false);
+    }
+  };
+
+  const handleAddToPlaylist = async (playlistId) => {
+    try {
+      const playlistRef = doc(db, 'playlists', playlistId);
+      await updateDoc(playlistRef, {
+        tracks: arrayUnion({
+          track_id: String(track.trackId),
+          track_name: track.trackName,
+          artist_name: track.artistName,
+          artwork_url: track.artworkUrl100?.replace('100x100', '300x300')
+        })
+      });
+      alert('Added to playlist successfully!');
+      setShowPlaylistMenu(false);
+    } catch (err) {
+      console.error(err);
+      alert('Error adding to playlist');
+    }
+  };
+
   const handleTranslate = async () => {
     if (!lyrics || lyrics.startsWith('Lyrics not found')) return;
     setTranslating(true);
@@ -231,11 +312,50 @@ const SongDetails = () => {
           </div>
           
           <div className="info-container">
-            <div className="badge">{track.primaryGenreName}</div>
-            <h1 className="song-title">{track.trackName}</h1>
-            <h2 className="song-artist text-gradient-primary">{track.artistName}</h2>
+            <div className="badge" style={{ marginBottom: '12px' }}>{track.primaryGenreName}</div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px' }}>
+              <div>
+                <h1 className="song-title" style={{ marginBottom: '4px' }}>{track.trackName}</h1>
+                <h2 className="song-artist text-gradient-primary">{track.artistName}</h2>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', position: 'relative' }}>
+                <button 
+                  className={`btn btn-secondary`} 
+                  onClick={() => {
+                    if (!user) { alert("Please sign in first"); navigate('/login'); return; }
+                    setShowPlaylistMenu(!showPlaylistMenu);
+                  }}
+                  title="Add to Playlist"
+                  style={{ padding: '12px', borderRadius: '50%', aspectRatio: '1/1', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.3s ease' }}
+                >
+                  <ListMusic size={20} />
+                </button>
+                {showPlaylistMenu && (
+                  <div className="playlist-dropdown glass-panel" style={{ position: 'absolute', top: '100%', right: '50%', marginTop: '8px', minWidth: '200px', zIndex: 100, padding: '8px', borderRadius: '8px' }}>
+                    <h4 style={{ margin: '0 0 8px 8px', fontSize: '12px', color: 'var(--text-muted)' }}>Save to Playlist</h4>
+                    {userPlaylists.length > 0 ? userPlaylists.map(pl => (
+                      <button key={pl.id} onClick={() => handleAddToPlaylist(pl.id)} className="btn btn-ghost" style={{ width: '100%', justifyContent: 'flex-start', padding: '8px', fontSize: '13px' }}>
+                        {pl.name}
+                      </button>
+                    )) : (
+                      <p style={{ fontSize: '12px', padding: '8px', margin: 0, color: 'var(--text-muted)' }}>No playlists found. Create one in your Profile.</p>
+                    )}
+                  </div>
+                )}
+                
+                <button 
+                  className={`btn ${isLiked ? 'btn-primary' : 'btn-secondary'}`} 
+                  onClick={handleLikeToggle}
+                  disabled={liking}
+                  title={isLiked ? "Remove from Liked Songs" : "Add to Liked Songs"}
+                  style={{ padding: '12px', borderRadius: '50%', aspectRatio: '1/1', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.3s ease' }}
+                >
+                  {liking ? <div className="loader" style={{width: 24, height: 24}}></div> : <Heart size={24} fill={isLiked ? '#000' : 'none'} color={isLiked ? '#000' : '#fff'} />}
+                </button>
+              </div>
+            </div>
             
-            <div className="meta-grid">
+            <div className="meta-grid" style={{ marginTop: '24px' }}>
               <div className="meta-card glass-panel">
                 <User className="meta-icon" />
                 <div className="meta-info">

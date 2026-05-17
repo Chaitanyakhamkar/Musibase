@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../supabase';
+import { db, auth } from '../firebase';
+import { signOut } from 'firebase/auth';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, orderBy, addDoc } from 'firebase/firestore';
 import { useAuth } from '../AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { User, LogOut, Settings, ListMusic, Heart, PlayCircle } from 'lucide-react';
+import { User, LogOut, Settings, ListMusic, Heart, PlayCircle, Music } from 'lucide-react';
 import './Profile.css';
 
 const Profile = () => {
@@ -26,38 +28,29 @@ const Profile = () => {
       setLoading(true);
       try {
         // Fetch Profile
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
+        const profileRef = doc(db, 'profiles', user.uid);
+        const profileSnap = await getDoc(profileRef);
           
-        if (profileData) {
-          setProfile(profileData);
+        if (profileSnap.exists()) {
+          setProfile(profileSnap.data());
         } else {
           // Auto create profile if missing
-          const { data: newProfile } = await supabase
-            .from('profiles')
-            .insert({ id: user.id, display_name: user.email.split('@')[0], avatar_url: '' })
-            .select()
-            .single();
-          if (newProfile) setProfile(newProfile);
+          const newProfile = { id: user.uid, display_name: user.email.split('@')[0], avatar_url: '' };
+          await setDoc(profileRef, newProfile);
+          setProfile(newProfile);
         }
 
         // Fetch Playlists
-        const { data: userPlaylists } = await supabase
-          .from('playlists')
-          .select('*, playlist_tracks(*)')
-          .eq('user_id', user.id);
-        if (userPlaylists) setPlaylists(userPlaylists);
+        const playlistsRef = collection(db, 'playlists');
+        const qPlaylists = query(playlistsRef, where('user_id', '==', user.uid));
+        const playlistsSnap = await getDocs(qPlaylists);
+        setPlaylists(playlistsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
         // Fetch Liked Songs
-        const { data: userLiked } = await supabase
-          .from('liked_songs')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('liked_at', { ascending: false });
-        if (userLiked) setLikedSongs(userLiked);
+        const likedRef = collection(db, 'liked_songs');
+        const qLiked = query(likedRef, where('user_id', '==', user.uid), orderBy('liked_at', 'desc'));
+        const likedSnap = await getDocs(qLiked);
+        setLikedSongs(likedSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
       } catch (err) {
         console.error(err);
@@ -72,10 +65,10 @@ const Profile = () => {
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     try {
-      await supabase.from('profiles').update({
+      await updateDoc(doc(db, 'profiles', user.uid), {
         display_name: profile.display_name,
         avatar_url: profile.avatar_url
-      }).eq('id', user.id);
+      });
       setIsEditing(false);
     } catch (err) {
       console.error(err);
@@ -84,8 +77,28 @@ const Profile = () => {
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await signOut(auth);
     navigate('/');
+  };
+
+  const handleCreatePlaylist = async () => {
+    const name = prompt("Enter a name for your new playlist (e.g., 'Gym Mix', 'Chill Vibes'):");
+    if (!name || !name.trim()) return;
+    
+    try {
+      const playlistsRef = collection(db, 'playlists');
+      const newPlaylist = {
+        name: name.trim(),
+        user_id: user.uid,
+        created_at: new Date().toISOString(),
+        tracks: []
+      };
+      const docRef = await addDoc(playlistsRef, newPlaylist);
+      setPlaylists([...playlists, { id: docRef.id, ...newPlaylist }]);
+    } catch (err) {
+      console.error(err);
+      alert("Error creating playlist");
+    }
   };
 
   if (loading) {
@@ -174,23 +187,38 @@ const Profile = () => {
 
           <div className="tab-pane">
             {activeTab === 'playlists' && (
-              <div className="playlists-grid">
-                {playlists.length > 0 ? playlists.map(pl => (
-                  <div key={pl.id} className="playlist-card glass-panel">
-                    <div className="playlist-cover">
-                      <Music size={40} className="cover-icon"/>
-                      <div className="track-count">{pl.playlist_tracks?.length || 0} Tracks</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ margin: 0 }}>Your Playlists</h3>
+                  <button onClick={handleCreatePlaylist} className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '13px' }}>
+                    + Create Playlist
+                  </button>
+                </div>
+                
+                <div className="playlists-grid">
+                  {playlists.length > 0 ? playlists.map(pl => (
+                    <div key={pl.id} className="playlist-card glass-panel">
+                      <div className="playlist-cover">
+                        {pl.tracks && pl.tracks.length > 0 ? (
+                          <img src={pl.tracks[0].artwork_url} alt="" style={{width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px'}} />
+                        ) : (
+                          <Music size={40} className="cover-icon"/>
+                        )}
+                        <div className="track-count" style={{ position: 'absolute', bottom: '8px', right: '8px', background: 'rgba(0,0,0,0.7)' }}>
+                          {pl.tracks?.length || 0} Tracks
+                        </div>
+                      </div>
+                      <div className="playlist-info">
+                        <h3>{pl.name}</h3>
+                      </div>
                     </div>
-                    <div className="playlist-info">
-                      <h3>{pl.name}</h3>
+                  )) : (
+                    <div className="empty-state" style={{ gridColumn: '1 / -1' }}>
+                      <ListMusic size={48} className="empty-icon" />
+                      <p>No playlists created yet.</p>
                     </div>
-                  </div>
-                )) : (
-                  <div className="empty-state">
-                    <ListMusic size={48} className="empty-icon" />
-                    <p>No playlists created yet.</p>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             )}
 

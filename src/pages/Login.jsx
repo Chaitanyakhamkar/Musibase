@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabase';
+import { auth } from '../firebase';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { Music, AlertCircle } from 'lucide-react';
 import './Login.css';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [otp, setOtp] = useState('');
-  const [showOtpInput, setShowOtpInput] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isSignUp, setIsSignUp] = useState(false);
@@ -16,7 +15,6 @@ const Login = () => {
 
   const switchTab = (toSignUp) => {
     setIsSignUp(toSignUp);
-    setShowOtpInput(false);
     setError(null);
   };
 
@@ -26,18 +24,10 @@ const Login = () => {
     setError(null);
     try {
       if (isSignUp) {
-        if (!showOtpInput) {
-          const { error } = await supabase.auth.signUp({ email, password });
-          if (error) throw error;
-          setShowOtpInput(true);
-        } else {
-          const { error } = await supabase.auth.verifyOtp({ email, token: otp, type: 'signup' });
-          if (error) throw error;
-          navigate('/');
-        }
+        await createUserWithEmailAndPassword(auth, email, password);
+        navigate('/');
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        await signInWithEmailAndPassword(auth, email, password);
         navigate('/');
       }
     } catch (err) {
@@ -55,10 +45,7 @@ const Login = () => {
     setLoading(true);
     setError(null);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + '/reset-password',
-      });
-      if (error) throw error;
+      await sendPasswordResetEmail(auth, email);
       alert('Check your email for a password reset link!');
     } catch (err) {
       setError(err.message || 'Error sending password reset link.');
@@ -109,64 +96,44 @@ const Login = () => {
               </div>
             )}
             
-            {showOtpInput ? (
-              <div className="input-group">
-                <label className="input-label">Enter 6-Digit Verification Code</label>
-                <input 
-                  type="text" 
-                  className="input-field" 
-                  placeholder="123456"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
-                  style={{ letterSpacing: '8px', textAlign: 'center', fontSize: '20px', padding: '16px' }}
-                  required
-                />
-                <p style={{fontSize: '13px', color: 'var(--primary-color)', marginTop: '8px', textAlign: 'center'}}>
-                  Check your email for the OTP!
-                </p>
+            <div className="input-group">
+              <label className="input-label">Email address</label>
+              <input 
+                type="email" 
+                className="input-field" 
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            
+            <div className="input-group">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label className="input-label" style={{ marginBottom: 0 }}>Password</label>
+                {!isSignUp && (
+                  <button 
+                     type="button" 
+                     className="btn-ghost" 
+                     style={{ fontSize: '13px', padding: 0, color: 'var(--primary-color)', border: 'none', background: 'none', cursor: 'pointer' }}
+                     onClick={handleForgotPassword}
+                  >
+                     Forgot Password?
+                  </button>
+                )}
               </div>
-            ) : (
-              <>
-                <div className="input-group">
-                  <label className="input-label">Email address</label>
-                  <input 
-                    type="email" 
-                    className="input-field" 
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                
-                <div className="input-group">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <label className="input-label" style={{ marginBottom: 0 }}>Password</label>
-                    {!isSignUp && (
-                      <button 
-                         type="button" 
-                         className="btn-ghost" 
-                         style={{ fontSize: '13px', padding: 0, color: 'var(--primary-color)', border: 'none', background: 'none', cursor: 'pointer' }}
-                         onClick={handleForgotPassword}
-                      >
-                         Forgot Password?
-                      </button>
-                    )}
-                  </div>
-                  <input 
-                    type="password" 
-                    className="input-field" 
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-              </>
-            )}
+              <input 
+                type="password" 
+                className="input-field" 
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
 
             <button type="submit" className="btn btn-primary login-btn" disabled={loading}>
-              {loading ? <div className="loader" style={{width:'18px',height:'18px',margin:'0 auto'}}></div> : (showOtpInput ? 'Verify & Create Account' : (isSignUp ? 'Sign Up' : 'Sign In'))}
+              {loading ? <div className="loader" style={{width:'18px',height:'18px',margin:'0 auto'}}></div> : (isSignUp ? 'Sign Up' : 'Sign In')}
             </button>
           </form>
 
