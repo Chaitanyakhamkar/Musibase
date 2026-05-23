@@ -34,6 +34,7 @@ function App() {
         </BrowserRouter>
       </PlayerProvider>
     </AuthProvider>
+  );
 }
 
 export default App;

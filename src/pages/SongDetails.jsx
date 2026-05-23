@@ -35,7 +35,6 @@ const SongDetails = () => {
   const [isEditingData, setIsEditingData] = useState(false);
   const [customData, setCustomData] = useState({ country: '', language: '', label: '' });
   const [wikiData, setWikiData] = useState(null);
-  const [fetchingWiki, setFetchingWiki] = useState(false);
 
   useEffect(() => {
     if (track) {
@@ -49,7 +48,6 @@ const SongDetails = () => {
   useEffect(() => {
     const fetchWiki = async () => {
       if (!track) return;
-      setFetchingWiki(true);
       try {
         const checkWiki = async (lang) => {
           let res = await fetch(`https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(track.artistName)}&utf8=&format=json&origin=*`);
@@ -100,8 +98,6 @@ const SongDetails = () => {
         }
       } catch (e) {
         console.error("Wiki fetch error", e);
-      } finally {
-        setFetchingWiki(false);
       }
     };
     fetchWiki();
@@ -140,15 +136,19 @@ const SongDetails = () => {
       if (track) {
         setLoadingLyrics(true);
         try {
-          // lyrics.ovh API format: /v1/artist/title
+          // lrclib API: https://lrclib.net/api/get?artist_name=...&track_name=...
           const artist = encodeURIComponent(track.artistName);
           const title = encodeURIComponent(track.trackName);
-          const res = await fetch(`https://api.lyrics.ovh/v1/${artist}/${title}`);
+          const res = await fetch(`https://lrclib.net/api/get?artist_name=${artist}&track_name=${title}`);
           if (res.ok) {
             const data = await res.json();
-            setLyrics(data.lyrics);
+            if (data.plainLyrics) {
+              setLyrics(data.plainLyrics);
+            } else {
+              setLyrics('Lyrics not found');
+            }
           } else {
-            setLyrics('Lyrics not found for this song.');
+            setLyrics('Lyrics not found');
           }
         } catch (err) {
           console.error('Error fetching lyrics:', err);
@@ -284,14 +284,6 @@ const SongDetails = () => {
       </div>
     );
   }
-
-  const msToMinutes = (ms) => {
-    const minutes = Math.floor(ms / 60000);
-    const seconds = ((ms % 60000) / 1000).toFixed(0);
-    return minutes + ":" + (seconds < 10 ? '0' : '') + seconds;
-  };
-
-  const releaseYear = new Date(track.releaseDate).getFullYear();
 
   const displayCountry = customData.country || wikiData?.country || (track.country === 'USA' ? 'United States' : track.country);
   const displayLang = customData.language || wikiData?.language || detectedLang;
@@ -473,6 +465,19 @@ const SongDetails = () => {
                 <div className="lyrics-loading">
                   <div className="loader"></div>
                   <p>Fetching lyrics from the database...</p>
+                </div>
+              ) : lyrics === 'Lyrics not found' || lyrics === 'Could not load lyrics at this time.' ? (
+                <div className="empty-state" style={{ padding: '40px 0', textAlign: 'center' }}>
+                  <Globe size={48} className="empty-icon" style={{ opacity: 0.5, marginBottom: '16px' }} />
+                  <p style={{ color: 'var(--text-muted)', marginBottom: '16px' }}>Official lyrics are not available for this track.</p>
+                  <a 
+                    href={`https://www.google.com/search?q=${encodeURIComponent(track.trackName + ' ' + track.artistName + ' lyrics')}`} 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className="btn btn-secondary"
+                  >
+                    Search Lyrics on Google
+                  </a>
                 </div>
               ) : (
                 <div className="lyrics-container" style={{ display: translatedLyrics ? 'flex' : 'block', gap: '24px' }}>

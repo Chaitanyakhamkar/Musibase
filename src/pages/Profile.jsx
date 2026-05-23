@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
 import { signOut } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, orderBy, addDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { useAuth } from '../AuthContext';
 import { usePlayer } from '../PlayerContext';
 import { useNavigate } from 'react-router-dom';
@@ -50,9 +50,11 @@ const Profile = () => {
 
         // Fetch Liked Songs
         const likedRef = collection(db, 'liked_songs');
-        const qLiked = query(likedRef, where('user_id', '==', user.uid), orderBy('liked_at', 'desc'));
+        const qLiked = query(likedRef, where('user_id', '==', user.uid));
         const likedSnap = await getDocs(qLiked);
-        setLikedSongs(likedSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        let songs = likedSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        songs.sort((a, b) => new Date(b.liked_at) - new Date(a.liked_at));
+        setLikedSongs(songs);
 
       } catch (err) {
         console.error(err);
@@ -135,6 +137,7 @@ const Profile = () => {
                   placeholder="Display Name"
                   className="input-field"
                 />
+                
                 <input 
                   type="text" 
                   value={profile.avatar_url || ''} 
@@ -142,6 +145,7 @@ const Profile = () => {
                   placeholder="Avatar Image URL (http://...)"
                   className="input-field"
                 />
+
                 <div style={{display: 'flex', gap: '8px', marginTop: '8px'}}>
                   <button type="submit" className="btn btn-primary btn-sm">Save</button>
                   <button type="button" onClick={() => setIsEditing(false)} className="btn btn-secondary btn-sm">Cancel</button>

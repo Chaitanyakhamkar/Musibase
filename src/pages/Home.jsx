@@ -9,8 +9,7 @@ import './Home.css';
 const Home = () => {
   const { user } = useAuth();
   const [recommendations, setRecommendations] = useState([]);
-  const [loadingRecs, setLoadingRecs] = useState(false);
-  const [query, setQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
@@ -67,7 +66,6 @@ const Home = () => {
     }
     
     const fetchRecommendations = async () => {
-      setLoadingRecs(true);
       try {
         const likedRef = collection(db, 'liked_songs');
         const qLiked = query(likedRef, where('user_id', '==', user.uid));
@@ -100,8 +98,6 @@ const Home = () => {
         }
       } catch (err) {
         console.error('Error fetching recs', err);
-      } finally {
-        setLoadingRecs(false);
       }
     };
     
@@ -126,11 +122,11 @@ const Home = () => {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    performSearch(query);
+    performSearch(searchQuery);
   };
 
   const handleGenreClick = (genre) => {
-    setQuery(genre);
+    setSearchQuery(genre);
     performSearch(genre);
   };
 
@@ -174,8 +170,8 @@ const Home = () => {
               type="text" 
               placeholder="Search for a song, artist, or movie..." 
               className="search-input"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
             <button type="submit" className="btn btn-primary" disabled={loading}>
               {loading ? <div className="loader"></div> : 'Search'}
@@ -193,8 +189,8 @@ const Home = () => {
                   fontSize: '13px', 
                   borderRadius: '99px', 
                   border: '1px solid var(--border-color)',
-                  background: query === genre ? 'var(--primary-color)' : 'var(--bg-color-light)',
-                  color: query === genre ? '#000' : 'var(--text-muted)'
+                  background: searchQuery === genre ? 'var(--primary-color)' : 'var(--bg-color-light)',
+                  color: searchQuery === genre ? '#000' : 'var(--text-muted)'
                 }}
               >
                 {genre}
