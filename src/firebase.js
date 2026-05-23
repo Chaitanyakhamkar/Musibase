@@ -4,13 +4,13 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+  apiKey: "AIzaSyBik2Iow4s3-finXTLpzob8gb0A_hvNIRA",
+  authDomain: "musibase-e67ed.firebaseapp.com",
+  projectId: "musibase-e67ed",
+  storageBucket: "musibase-e67ed.firebasestorage.app",
+  messagingSenderId: "659357001842",
+  appId: "1:659357001842:web:717b384eb5a0ba8837baeb",
+  measurementId: "G-CTCW917VH8"
 };
 
 const app = initializeApp(firebaseConfig);
