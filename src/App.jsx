@@ -4,6 +4,7 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Home from './pages/Home';
 import SongDetails from './pages/SongDetails';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 import { AuthProvider } from './AuthContext';
 import { PlayerProvider } from './PlayerContext';
@@ -33,6 +34,7 @@ function App() {
           </div>
         </BrowserRouter>
       </PlayerProvider>
+      <SpeedInsights />
     </AuthProvider>
   );
 }
